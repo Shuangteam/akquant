@@ -2,6 +2,7 @@ from typing import Any, Sequence
 
 from ..akquant import DataFeed
 from .brokers.ctp.adapter import CTPMarketAdapter, CTPTraderAdapter
+from .brokers.futu.gateway import FutuMarketGateway, FutuTraderGateway
 from .brokers.miniqmt.stub import MiniQMTMarketGateway, MiniQMTTraderGateway
 from .brokers.ptrade.stub import PTradeMarketGateway, PTradeTraderGateway
 from .protocols import GatewayBundle, MarketGateway, TraderGateway
@@ -84,6 +85,29 @@ def create_gateway_bundle(
             metadata={"broker": "miniqmt"},
         )
 
+    if broker_key == "futu":
+        market_gateway = FutuMarketGateway(
+            feed=feed,
+            symbols=list(symbols),
+            host=kwargs.get("host", "127.0.0.1"),
+            port=int(kwargs.get("port", 11111)),
+            **{k: v for k, v in kwargs.items() if k not in ("host", "port")},
+        )
+        futu_trader_gateway: TraderGateway | None = FutuTraderGateway(
+            host=kwargs.get("host", "127.0.0.1"),
+            port=int(kwargs.get("port", 11111)),
+            trd_env=kwargs.get("trd_env", "SIMULATE"),
+            trd_market=kwargs.get("trd_market", "HK"),
+            **{k: v for k, v in kwargs.items()
+               if k not in ("host", "port", "trd_env", "trd_market")},
+        )
+        return GatewayBundle(
+            market_gateway=market_gateway,
+            trader_gateway=futu_trader_gateway,
+            trader_capabilities=_resolve_trader_capabilities(futu_trader_gateway),
+            metadata={"broker": "futu"},
+        )
+
     if broker_key == "ptrade":
         market_gateway = PTradeMarketGateway(
             feed=feed,
@@ -98,7 +122,7 @@ def create_gateway_bundle(
             metadata={"broker": "ptrade"},
         )
 
-    builtins = ["ctp", "miniqmt", "ptrade"]
+    builtins = ["ctp", "futu", "miniqmt", "ptrade"]
     registered = list_registered_brokers()
     all_brokers = builtins + [name for name in registered if name not in builtins]
     supported = ", ".join(all_brokers)
